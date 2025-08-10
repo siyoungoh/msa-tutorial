@@ -1,0 +1,6 @@
+server:
+  port: 8080
+userservice:
+  base-url: http://userservice:8081
+
+

@@ -46,5 +46,26 @@ bash scripts/docker-multi.sh
   - 정상: `GET http://localhost:8080/posts/1`
   - 실패 실험: userservice 컨테이너 중단 후 동일 요청
 
+## 7. 스크립트 사용(멀티모듈 기준)
+- 파일: `scripts/docker-multi.sh`
+- 기능: 모듈 JAR 빌드 → 모듈 Dockerfile로 이미지 빌드 → 컨테이너 실행 → 통신 검증
+
+환경변수
+- `PUBLISH`: true|false (기본 true). false면 호스트 포트 바인딩 생략
+- `VERIFY_HOST`: 검증 대상 호스트/IP (기본 localhost)
+- `VERIFY_POST_PORT`: 검증 대상 PostService 포트 (기본 8080)
+
+예시
+```
+# 로컬 기본 실행(8080/8081 공개, localhost 검증)
+bash scripts/docker-multi.sh
+
+# 원격 호스트 검증(예: 20.30.40.50:80)
+VERIFY_HOST=20.30.40.50 VERIFY_POST_PORT=80 bash scripts/docker-multi.sh
+
+# 내부 네트워크만 사용(포트 공개 생략)
+PUBLISH=false bash scripts/docker-multi.sh
+```
+
 
 
