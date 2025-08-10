@@ -2,6 +2,7 @@ package com.example.postservice;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -13,7 +14,15 @@ public class UserClient {
 
     private final RestTemplate restTemplate;
 
-    private static final String USER_SERVICE_URL = "http://localhost:8080/users/";
+    @Value("${userservice.base-url:http://localhost:8080}")
+    private String userServiceBaseUrl;
+
+    private String getUserUrl(Long userId) {
+        String base = userServiceBaseUrl.endsWith("/")
+                ? userServiceBaseUrl.substring(0, userServiceBaseUrl.length() - 1)
+                : userServiceBaseUrl;
+        return base + "/users/" + userId;
+    }
 
     public String getUserName(Long userId) {
         // =======================
@@ -29,7 +38,7 @@ public class UserClient {
     @SuppressWarnings("unused") // 전략 선택을 위한 메소드
     private String strategyA(Long userId) {
         try {
-            ResponseEntity<UserResponse> response = restTemplate.getForEntity(USER_SERVICE_URL + userId,
+            ResponseEntity<UserResponse> response = restTemplate.getForEntity(getUserUrl(userId),
                     UserResponse.class);
             UserResponse body = response.getBody();
             return body != null ? body.getName() : null;
@@ -42,7 +51,7 @@ public class UserClient {
     @SuppressWarnings("unused") // 전략 선택을 위한 메소드
     private String strategyB(Long userId) {
         try {
-            ResponseEntity<UserResponse> response = restTemplate.getForEntity(USER_SERVICE_URL + userId,
+            ResponseEntity<UserResponse> response = restTemplate.getForEntity(getUserUrl(userId),
                     UserResponse.class);
             UserResponse body = response.getBody();
             return body != null ? body.getName() : "Unknown User";
@@ -54,7 +63,7 @@ public class UserClient {
 
     @SuppressWarnings("unused") // 전략 선택을 위한 메소드
     private String strategyC(Long userId) {
-        ResponseEntity<UserResponse> response = restTemplate.getForEntity(USER_SERVICE_URL + userId,
+        ResponseEntity<UserResponse> response = restTemplate.getForEntity(getUserUrl(userId),
                 UserResponse.class);
         UserResponse body = response.getBody();
         if (body == null) {
@@ -67,7 +76,7 @@ public class UserClient {
         int retryCount = 0;
         while (retryCount < 3) {
             try {
-                ResponseEntity<UserResponse> response = restTemplate.getForEntity(USER_SERVICE_URL + userId,
+                ResponseEntity<UserResponse> response = restTemplate.getForEntity(getUserUrl(userId),
                         UserResponse.class);
                 UserResponse body = response.getBody();
                 if (body != null) {
