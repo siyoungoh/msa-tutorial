@@ -1,4 +1,4 @@
-# Block 2: Docker 환경 전환 실습 안내
+# 게시판-회원 MSA 목업
 
 간단한 게시판-회원 MSA 목업 구성입니다.
 - PostService(8080): 게시글 API 제공. 사용자 이름 조회 시 UserService를 호출
