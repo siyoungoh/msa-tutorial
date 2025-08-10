@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # UserClient 통합 테스트 자동화 스크립트
-# - 성공(8080) / 실패(8081) 시나리오를 자동으로 빌드/기동/검증합니다.
+# - 정상 동작(8080) 시나리오와 장애(8081) 시나리오를 자동으로 빌드/기동/검증합니다.
 # - 로컬 또는 원격 호스트에 대해 헬스체크 폴링과 엔드포인트 호출을 수행합니다.
 #
 # 사용 예시
@@ -15,6 +15,14 @@
 # 환경 변수
 #   - APP_JAR:     테스트할 부팅 가능한 JAR 경로 (기본: build/libs/msa-0.0.1-SNAPSHOT.jar)
 #   - TARGET_HOST: 테스트 대상 호스트 (기본: localhost)
+#   - STRATEGY:    현재 선택된 전략(A|B|C|D). C일 때 장애 시나리오는 5xx 기대로 처리(정상은 성공 기대)
+#   - EXPECT_FALLBACK: 실패 시 기대 값(기본: Unknown User, A일 때 __NULL__ 권장)
+#
+# 전략별 실행 예시
+#   - Strategy A: EXPECT_FALLBACK='__NULL__' bash msa/scripts/test-userclient.sh both
+#   - Strategy B: bash msa/scripts/test-userclient.sh both
+#   - Strategy C: STRATEGY=C bash msa/scripts/test-userclient.sh both
+#   - Strategy D: bash msa/scripts/test-userclient.sh both
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -24,6 +32,11 @@ cd "$ROOT_DIR"
 # 예) APP_JAR=/path/to/other.jar TARGET_HOST=192.168.0.10 bash scripts/test-userclient.sh success
 APP_JAR="${APP_JAR:-build/libs/msa-0.0.1-SNAPSHOT.jar}"
 TARGET_HOST="${TARGET_HOST:-localhost}"
+## 실패 시 기대하는 폴백 값 설정
+## - 기본: "Unknown User" (Strategy B/D)
+## - Strategy A에서 null 기대 시: EXPECT_FALLBACK="__NULL__"
+EXPECT_FALLBACK="${EXPECT_FALLBACK:-Unknown User}"
+STRATEGY="${STRATEGY:-}"
 
 log() { echo "[$(date '+%H:%M:%S')] $*"; }  # 타임스탬프 로그 출력
 
@@ -100,14 +113,36 @@ test_failure() {
   run_port "$port"
   log "Testing failure scenario on ${port} (fallback expected)..."
   echo "== /posts (failure expected) =="
-  local resp
-  resp="$(curl -sS "http://${TARGET_HOST}:${port}/posts")"
-  echo "$resp"
-  if grep -q "Unknown User" <<<"$resp"; then
-    log "Fallback OK in failure scenario"
+  if [[ "${STRATEGY}" == "C" ]]; then
+    # Strategy C: 실패 시 예외 전파 → API 5xx 기대
+    local code
+    code="$(curl -sS -o /dev/null -w "%{http_code}" "http://${TARGET_HOST}:${port}/posts" || true)"
+    echo "HTTP ${code}"
+    if [[ "$code" == 5* || "$code" == "000" ]]; then
+      log "Strategy C expected failure (5xx) OK"
+    else
+      log "Strategy C expected 5xx, but got ${code}"
+      exit 1
+    fi
   else
-    log "Fallback NOT applied"
-    exit 1
+    local resp
+    resp="$(curl -sS "http://${TARGET_HOST}:${port}/posts")"
+    echo "$resp"
+    if [[ "$EXPECT_FALLBACK" == "__NULL__" ]]; then
+      if grep -q '"authorName":null' <<<"$resp"; then
+        log "Fallback (null) OK in failure scenario"
+      else
+        log "Fallback (null) NOT applied"
+        exit 1
+      fi
+    else
+      if grep -q "${EXPECT_FALLBACK}" <<<"$resp"; then
+        log "Fallback (${EXPECT_FALLBACK}) OK in failure scenario"
+      else
+        log "Fallback (${EXPECT_FALLBACK}) NOT applied"
+        exit 1
+      fi
+    fi
   fi
 }
 
